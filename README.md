@@ -1,78 +1,113 @@
-# 🚦 Traffic Light Controller (Verilog | FSM | RTL Design)
+# 🚦 Traffic Light Controller – Asynchronous FSM with Formal Verification
 
 ## 🧭 Overview
-This project implements a **Finite State Machine (FSM)-based Traffic Light Controller** using **Verilog HDL**, designed to manage **North–South (NS)** and **East–West (EW)** traffic flow.  
-The controller features **timed sequencing**, **manual override (button-based control)**, and **asynchronous reset functionality**.  
-The design was developed, simulated, and verified using **Xilinx Vivado**, showcasing practical skills in **RTL design and verification**.
+This updated version of the Traffic Light Controller builds upon the earlier **timed FSM-based model** by introducing **asynchronous, event-driven logic** and **formal verification** techniques.  
+It uses **Kripke Structure modeling** and **Computational Temporal Logic (CTL)** to formally verify correctness properties, ensuring safe and predictable traffic behavior before hardware synthesis.
+
+The updated design allows **dynamic state transitions** triggered by a **button input**, simulating real-world sensor or pedestrian-based requests.  
+Additionally, the design includes **synthesis analysis** to estimate **critical path delay, dynamic power, and resource utilization**, demonstrating a complete design–verify–analyze workflow.
 
 ---
 
-## ⚙️ Features
-- FSM-based design for traffic light management  
-- Asynchronous reset and manual button-triggered override  
-- Integrated timer/counter and output encoder logic  
-- **Vivado simulation** for waveform and timing verification  
-- Testbench includes clock generation, reset, and button press sequences  
-- Output validation via both **waveform** and **console logs**
+## ⚙️ Key Improvements from the Previous Version
+
+| Feature | Previous Version | Updated Version |
+|----------|------------------|-----------------|
+| **Design Type** | Synchronous FSM with fixed timer | Asynchronous FSM driven by input/button |
+| **Control Input** | Emergency signal override | Event-triggered input (`button`) |
+| **State Count** | 4 states | 5 states (`S0–S4`) including both-road red & side transitions |
+| **Behavior** | Periodic time-based switching | On-demand side road activation |
+| **Verification** | Functional simulation only | Formal verification with Kripke structure + CTL |
+| **Analysis** | Behavioral simulation only | Added synthesis-level timing, power, and resource analysis |
+| **Purpose** | Demonstration of FSM logic | Demonstration of verified, hardware-optimized control |
 
 ---
 
-## 🧩 Design Details
+## 🔄 FSM Specification
 
-| Signal | Description |
-|:-------|:-------------|
-| `clk` | System clock |
-| `rst` | Asynchronous reset |
-| `button` | Manual button input for side-road activation |
-| `main_red`, `main_yellow`, `main_green` | Main road signal lights |
-| `side_red`, `side_yellow`, `side_green` | Side road signal lights |
+The controller now includes **five defined states**:
 
-### FSM States
+| State | Description | Active Lights |
+|:------|:-------------|:---------------|
+| `S0` | Both Red (Idle) | Main = Red, Side = Red |
+| `S1` | Main Yellow | Main = Yellow, Side = Red |
+| `S2` | Main Green | Main = Green, Side = Red |
+| `S3` | Side Yellow | Main = Red, Side = Yellow |
+| `S4` | Side Green | Main = Red, Side = Green |
 
-| State | Description |
-|:------|:-------------|
-| `S0` | Both Red (All Stop) |
-| `S1` | Main Yellow (Transition Phase) |
-| `S2` | Main Green (Main Flow) |
-| `S3` | Main Red + Side Yellow (Prepare Side Flow) |
-| `S4` | Main Red + Side Green (Side Flow Active) |
+A **button input** acts as a trigger, allowing vehicles or pedestrians to request a green signal for the side road while maintaining mutual exclusion of greens between directions.
 
 ---
 
-## 🧠 Verilog Implementation
+## 🧮 Formal Modeling & Verification
 
-### 🔹 Main Module: `traffic_light_controller.v`
-Implements the FSM for traffic light sequencing, state transitions, and output control signals.  
-State transitions are triggered by **clock**, **reset**, and **button input**.
+### 🔹 Kripke Structure
+The FSM behavior is modeled as a **Kripke Structure (K = (S, R, L))**, where:
+- `S` → Set of system states (`S0–S4`)
+- `R` → Transition relations between states
+- `L` → Labeling function mapping states to atomic propositions (e.g., “Main_Green,” “Side_Red”)
 
-### 🔹 Testbench: `tb_traffic_light_controller.v`
-Generates the **clock**, applies **reset**, and simulates **button presses** to verify system behavior.  
-Also logs the current **state** and **signal values** during simulation.
+### 🔹 CTL Property Verification
+Using **Computational Temporal Logic (CTL)**, critical system properties can be expressed as:
 
----
-
-## 🧪 Simulation and Verification
-
-### 🖥️ Vivado Waveform Output
-Behavioral simulation in Vivado validates the timing and sequencing of all signals.  
-The waveform shows correct transitions between traffic states and response to button input.
-
-<p align="center">
-  <img src="waveform.png" alt="Vivado Waveform Output" width="800"/>
-</p>
+| Property | CTL Formula | Meaning |
+|-----------|-------------|----------|
+| **Safety** | `AG ¬(Main_Green ∧ Side_Green)` | Never both green simultaneously |
+| **Liveness** | `AF Side_Green` | Eventually side road will get green |
+| **Fairness** | `AG (Button → AF Side_Green)` | If button pressed, side green occurs eventually |
 
 ---
 
-### 🧾 Console Output Log
-The console output confirms correct state transitions, light sequencing, and response to button activation.
+## 🧪 Simulation and Results
 
-<p align="center">
-  <img src="simulation_output.png" alt="Console Output Log" width="450"/>
-</p>
+### 🖥 Console Output Snapshot
+```
+Time    State   Main(R,Y,G)   Side(R,Y,G)   Button
+0       000     100           100           0
+25000   010     001           100           0
+65000   011     100           010           1
+75000   100     100           001           0
+...
+```
+
+- Button press during `Main Green` triggers transition to side road sequence (`S3 → S4`).  
+- No conflicting green states observed.  
+- FSM resumes normal sequence once side phase completes.
+
+### 📊 Waveform Output
+![Simulation Output](simulation_output.png)
+![Waveform](waveform.png)
+
+- Asynchronous button signal triggers side sequence instantly  
+- Correct red-yellow-green alternation maintained  
+- Safe mutual exclusion verified visually  
+
+---
+
+## ⚡ Hardware Synthesis Analysis
+
+After implementing the design on an FPGA:
+- **Critical Path Delay:** Measured to determine system clock limit  
+- **Dynamic Power:** Estimated for switching activities  
+- **Resource Usage:** LUTs, flip-flops, and combinational resources analyzed  
+
+This provides hardware feasibility insights for real-world deployment.
+
+---
+
+## 🧩 Future Directions
+
+🔹 Integrate **sensor-based adaptive control** (vehicle detection, traffic density inputs)  
+🔹 Expand to a **4-way intersection** with synchronization logic  
+🔹 Implement **priority scheduling** (ambulance/bus lanes)  
+🔹 Add **pedestrian signals with countdown timers**  
+🔹 Develop a **hardware-verified formal proof report** linking FSM states with CTL validation  
 
 ---
 
 ## 👨‍💻 Author
 **Vishwas Jasuja**  
-B.Tech Microelectronics and VLSI, IIT Mandi
+B.Tech in Microelectronics and VLSI, IIT Mandi  
+*Designed, formally verified, and simulated using Verilog HDL and temporal logic concepts.*
 
+📎 [GitHub Profile](https://github.com/VishwasJ05)
